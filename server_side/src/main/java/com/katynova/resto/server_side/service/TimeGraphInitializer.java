@@ -1,6 +1,5 @@
-package com.katynova.resto.booking.service.time_graph.config;
+package com.katynova.resto.server_side.service;
 
-import com.katynova.resto.booking.service.time_graph.TimeGraphService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

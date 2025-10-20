@@ -1,5 +1,6 @@
-package com.katynova.resto.booking.service.time_graph.model;
+package com.katynova.resto.server_side.model.info;
 
+import com.katynova.resto.server_side.model.GraphSlot;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

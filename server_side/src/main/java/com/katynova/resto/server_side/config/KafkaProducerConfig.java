@@ -1,7 +1,7 @@
-package com.katynova.resto.booking.config;
+package com.katynova.resto.server_side.config;
 
-import com.katynova.resto.booking.dto.response.BookingResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.katynova.resto.common_dto_library.response.BookingResponse;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.context.annotation.Bean;

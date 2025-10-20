@@ -1,4 +1,4 @@
-package com.katynova.resto.booking.service.time_graph.config;
+package com.katynova.resto.server_side.config;
 
 
 import org.springframework.context.ApplicationEvent;

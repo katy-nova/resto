@@ -1,27 +1,28 @@
-package com.katynova.resto.booking.service.time_graph;
+package com.katynova.resto.server_side.service;
 
-import com.katynova.resto.booking.dto.BookingRequestDto;
-import com.katynova.resto.booking.service.raw_booking_sql.model.FindResponse;
-import com.katynova.resto.booking.dto.response.*;
-import com.katynova.resto.booking.exception.ConfirmationException;
-import com.katynova.resto.booking.model.Booking;
-import com.katynova.resto.booking.model.Status;
-import com.katynova.resto.booking.repository.BookingRepository;
-import com.katynova.resto.booking.repository.TableRepository;
-import com.katynova.resto.booking.service.BookingService;
-import com.katynova.resto.booking.service.time_graph.model.AppropriateBookingInfo;
-import com.katynova.resto.booking.service.time_graph.model.GraphSlot;
-import com.katynova.resto.booking.service.time_graph.model.SuggestBookingInfo;
+import com.katynova.resto.common_dto_library.BookingRequestDto;
+import com.katynova.resto.common_dto_library.response.*;
+import com.katynova.resto.server_side.model.FindResponse;
+import com.katynova.resto.server_side.model.entity.Booking;
+import com.katynova.resto.server_side.model.info.AppropriateBookingInfo;
+import com.katynova.resto.server_side.model.info.SuggestBookingInfo;
+import com.katynova.resto.server_side.model.status.Status;
+import com.katynova.resto.server_side.repository.BookingRepository;
+import com.katynova.resto.server_side.repository.TableRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
@@ -67,20 +68,39 @@ public class BookingTimeGraphService implements BookingService {
         return wait;
     }
 
-    protected BookingResponse sendSuggestResponse(BookingRequestDto bookingRequestDto, FindResponse<?> response) {
+    public BookingResponse sendSuggestResponse(BookingRequestDto bookingRequestDto, FindResponse<?> response) {
         // не делаю проверку, тк здесь не может оказаться другого типа
         @SuppressWarnings("unchecked")
-        List<SuggestBookingInfo> listOfSuggestions =  (List<SuggestBookingInfo>) response.getList();
+        List<SuggestBookingInfo> listOfSuggestions = (List<SuggestBookingInfo>) response.getList();
         List<Slot> slots = new ArrayList<>();
+        LocalDateTime expired = LocalDateTime.now().plusMinutes(10);
         for (SuggestBookingInfo suggestBookingInfo : listOfSuggestions) {
-            Slot slot = createSlot(bookingRequestDto.getStartTime(), suggestBookingInfo);
+            Booking booking = createBooking(bookingRequestDto, suggestBookingInfo.getTableNumber(), Status.PENDING);
+            booking.setExpired(expired);
+            bookingRepository.save(booking);
+            suggestBookingInfo.getSlots().forEach(graphSlot -> graphSlot.book(booking.getId()));
+            Slot slot = createSlot(bookingRequestDto.getStartTime(), suggestBookingInfo, booking.getId());
             slots.add(slot);
         }
         return new BookingSuggestResponse(bookingRequestDto.getCorrelationId(), bookingRequestDto.getRequestId(),
-                slots, LocalDateTime.now().plusMinutes(10));
+                slots, expired);
     }
 
-    private Slot createSlot(LocalDateTime start, SuggestBookingInfo suggestBookingInfo) {
+    private Booking createBooking(BookingRequestDto bookingRequestDto, int tableNumber, Status status) {
+        Booking booking = new Booking();
+        booking.setStartTime(bookingRequestDto.getStartTime());
+        booking.setEndTime(bookingRequestDto.getStartTime().plus(bookingRequestDto.getDuration()));
+        booking.setStatus(status);
+        booking.setRestTable(tableRepository.getReferenceById(tableNumber));
+        booking.setGuestId(bookingRequestDto.getGuestId());
+        booking.setPersons(bookingRequestDto.getPersons());
+        if (bookingRequestDto.getNotes() != null && !bookingRequestDto.getNotes().isEmpty()) {
+            booking.setNotes(bookingRequestDto.getNotes());
+        }
+        return booking;
+    }
+
+    private Slot createSlot(LocalDateTime start, SuggestBookingInfo suggestBookingInfo, Long bookingId) {
         // обрабатываем возможный переход через 00:00
         // не знаю, как здесь сделать правильно, было бы удобнее не обрабатывать, ведь ключ в мапе останется по прошлому
         //дню, но надо же во внешку отдавать красиво
@@ -99,23 +119,14 @@ public class BookingTimeGraphService implements BookingService {
         LocalDateTime startDateTime = LocalDateTime.of(startDay, startTime);
         LocalDateTime endDateTime = LocalDateTime.of(endDay, end);
         // здесь мы вместо букинг id будем использовать номер стола, чтобы потом найти эту бронь
-        return new Slot((long) suggestBookingInfo.getTableNumber(), startDateTime, endDateTime);
+        return new Slot(bookingId, startDateTime, endDateTime);
     }
 
     @Transactional
     protected BookingResponse getSuccessResponse(BookingRequestDto bookingRequestDto, FindResponse<?> response) {
         @SuppressWarnings("unchecked")
-        AppropriateBookingInfo<GraphSlot> info = (AppropriateBookingInfo<GraphSlot>) response.getList().getFirst();
-        Booking booking = new Booking();
-        booking.setStartTime(bookingRequestDto.getStartTime());
-        booking.setEndTime(bookingRequestDto.getStartTime().plus(bookingRequestDto.getDuration()));
-        booking.setStatus(Status.CONFIRMED);
-        booking.setRestTable(tableRepository.getReferenceById(info.getTableNumber()));
-        booking.setGuestId(bookingRequestDto.getGuestId());
-        booking.setPersons(bookingRequestDto.getPersons());
-        if (bookingRequestDto.getNotes() != null && !bookingRequestDto.getNotes().isEmpty()) {
-            booking.setNotes(bookingRequestDto.getNotes());
-        }
+        AppropriateBookingInfo info = (AppropriateBookingInfo) response.getList().getFirst();
+        Booking booking = createBooking(bookingRequestDto, info.getTableNumber(), Status.CONFIRMED);
         // сохраняем бронь в реп
         bookingRepository.save(booking);
         // теперь у брони есть айди и мы ставим их id слотам
@@ -125,51 +136,30 @@ public class BookingTimeGraphService implements BookingService {
     }
 
     @Override
-    public void removeSuggestedBookings(BookingResponse response) {
-        timeGraphService.removeSuggestedBookings(response);
+    @Transactional
+    public BookingResponse confirmSlot(SlotConfirmation slot) {
+        try {
+            Booking booking = bookingRepository.findById(slot.getConfirmSlotId())
+                    .orElseThrow(NoSuchElementException::new);
+            booking.setStatus(Status.CONFIRMED);
+            if (!slot.getRejectedSlotIds().isEmpty()) {
+                bookingRepository.deleteAllById(slot.getRejectedSlotIds());
+                timeGraphService.unreserveSlotsByBookingId(slot.getRejectedSlotIds(), booking.getStartTime());
+            }
+            return new BookingSuccessResponse(slot.getCorrelationId(), slot.getRequestId());
+        } catch (NoSuchElementException e) {
+            return new BookingErrorResponse(slot.getCorrelationId(), slot.getRequestId(),
+                    "Время подтверждения бронирования истекло");
+        }
     }
 
-    @Override
+    @Scheduled(cron = "0 * * * * *")
     @Transactional
-    public BookingResponse confirmSlot(SlotConfirmation slot, BookingResponse response, BookingRequestDto bookingRequestDto) {
-        int tableNum = slot.getSlot().getBookingId().intValue();
-        if (!timeGraphService.containsCorrelationId(bookingRequestDto.getCorrelationId())) {
-            log.warn("Зарезервированные слоты для бронирования {} не найдены", response.getCorrelationId());
-            return new BookingErrorResponse(response.getCorrelationId(), response.getRequestId(),
-                    "Зарезервированные слоты для бронирования не найдены");
+    public void cleanUpExpiredBookings() {
+        List<Long> expiredIds = bookingRepository.deleteExpiredBookingsAndReturnIds();
+        if (!expiredIds.isEmpty()) {
+            timeGraphService.unreserveSlotsByBookingId(expiredIds, LocalDateTime.now());
         }
-        if (!timeGraphService.containsSlotsForTable(bookingRequestDto.getCorrelationId(), tableNum)) {
-            log.warn("Слот для стола {} не найден", tableNum);
-            return new BookingErrorResponse(response.getCorrelationId(), response.getRequestId(),
-                    "Слот для указанного стола не найден");
-        }
-        BookingSuggestResponse suggestResponse = (BookingSuggestResponse) response;
-        if (!suggestResponse.getSlots().contains(slot.getSlot())) {
-            return new BookingErrorResponse(response.getCorrelationId(), response.getRequestId(),
-                    "Слот для указанного времени не найден");
-        }
-        try {
-            Booking booking = new Booking();
-            booking.setGuestId(bookingRequestDto.getGuestId());
-            booking.setPersons(bookingRequestDto.getPersons());
-            booking.setStartTime(slot.getSlot().getStartTime());
-            booking.setEndTime(slot.getSlot().getEndTime());
-            booking.setStatus(Status.CONFIRMED);
-            if (bookingRequestDto.getNotes() != null && !bookingRequestDto.getNotes().isEmpty()) {
-                booking.setNotes(bookingRequestDto.getNotes());
-            }
-            booking.setRestTable(tableRepository.findByTableNumber(tableNum).orElseThrow());
-            bookingRepository.save(booking);
-            timeGraphService.confirmSlot(suggestResponse, tableNum, booking.getId());
-        } catch (NoSuchElementException e) {
-            log.warn("Стол для бронирования {} не найдены", response.getCorrelationId());
-            return new BookingErrorResponse(response.getCorrelationId(), response.getRequestId(), "Резерв для бронирования не найден");
-        } catch (ConfirmationException e) {
-            return new BookingErrorResponse(response.getCorrelationId(), response.getRequestId(), e.getMessage());
-        } catch (Exception e) {
-            log.warn("Непредвиденная ошибка для брони: {}", response.getCorrelationId());
-            return new BookingErrorResponse(response.getCorrelationId(), response.getRequestId(), "Непредвиденная ошибка");
-        }
-        return new BookingSuccessResponse(response.getCorrelationId(), response.getRequestId());
     }
+
 }

@@ -1,0 +1,4 @@
+worktime:
+  open-time: "10:00"
+  close-weekdays-time: "23:00"
+  close-weekend-time: "01:00"

@@ -1,6 +1,6 @@
-package com.katynova.resto.booking.service;
+package com.katynova.resto.server_side.utility_service;
 
-import com.katynova.resto.booking.config.WorkTimeConfig;
+import com.katynova.resto.server_side.config.WorkTimeConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

@@ -1,4 +1,4 @@
-package com.katynova.resto.booking.exception;
+package com.katynova.resto.server_side.exception;
 
 public class ManagerRequirementException extends RuntimeException {
     public ManagerRequirementException(String message) {

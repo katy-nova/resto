@@ -1,1 +1,5 @@
 rootProject.name = 'resto'
+
+include('client')
+include('common_dto_library')
+include('server_side')

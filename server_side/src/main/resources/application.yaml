@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: booking
+
+  config:
+    import:
+      - application-worktime.yaml
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/resto_booking
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        id:
+          optimizer:
+            pooled:
+              preferred: pooled-lo
+        generate_statistics: false
+        session:
+          events:
+            log: false
+
+  liquibase:
+    enabled: true
+    change-log: classpath:/db/changelog/changelog-master.yaml

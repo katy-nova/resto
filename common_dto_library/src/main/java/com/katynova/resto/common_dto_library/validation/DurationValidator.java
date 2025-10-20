@@ -1,4 +1,4 @@
-package com.katynova.resto.validation;
+package com.katynova.resto.common_dto_library.validation;
 
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;

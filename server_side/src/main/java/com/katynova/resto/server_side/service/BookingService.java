@@ -1,12 +1,11 @@
-package com.katynova.resto.booking.service;
+package com.katynova.resto.server_side.service;
 
-import com.katynova.resto.booking.dto.BookingRequestDto;
-import com.katynova.resto.booking.dto.response.BookingResponse;
-import com.katynova.resto.booking.dto.response.SlotConfirmation;
+import com.katynova.resto.common_dto_library.BookingRequestDto;
+import com.katynova.resto.common_dto_library.response.BookingResponse;
+import com.katynova.resto.common_dto_library.response.SlotConfirmation;
 
 public interface BookingService {
 
     BookingResponse getResponse(BookingRequestDto bookingRequestDto);
-    void removeSuggestedBookings(BookingResponse response);
-    BookingResponse confirmSlot(SlotConfirmation slot, BookingResponse response, BookingRequestDto bookingRequestDto);
+    BookingResponse confirmSlot(SlotConfirmation slot);
 }

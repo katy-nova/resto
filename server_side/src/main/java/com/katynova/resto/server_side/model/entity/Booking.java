@@ -1,5 +1,6 @@
-package com.katynova.resto.server_side.model;
+package com.katynova.resto.server_side.model.entity;
 
+import com.katynova.resto.server_side.model.status.Status;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

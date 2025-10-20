@@ -1,2 +1,23 @@
 databaseChangeLog:
-  - 
+  - changeSet:
+      id: 1
+      author: katynova
+      changes:
+        - createTable:
+            tableName: restaurant_tables
+            columns:
+              - column:
+                  name: table_number
+                  type: INT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: capacity
+                  type: INT
+                  constraints:
+                    nullable: false
+                    checkConstraint: "capacity > 0"
+              - column:
+                  name: note
+                  type: VARCHAR(255)

@@ -1,11 +1,11 @@
-package com.katynova.config;
+package com.katynova.resto.client.config;
 
-import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.katynova.resto.common_dto_library.BookingRequestDto;
+import com.katynova.resto.common_dto_library.response.BookingResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,11 +23,9 @@ import org.springframework.kafka.requestreply.ReplyingKafkaTemplate;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
-import com.katynova.dto.data.HotDataDto;
 
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Configuration
@@ -41,7 +39,7 @@ public class KafkaRequestReplyConfig {
     private String bootstrapServers;
 
     @Bean
-    public ProducerFactory<String, List<Long>> requestProducerFactory() {
+    public ProducerFactory<String, BookingRequestDto> requestProducerFactory() {
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, this.bootstrapServers);
         config.put(ProducerConfig.ACKS_CONFIG, "all");
@@ -51,35 +49,24 @@ public class KafkaRequestReplyConfig {
     }
 
     @Bean
-    public ConsumerFactory<String, List<HotDataDto>> replyConsumerFactory() {
+    public ConsumerFactory<String, BookingResponse> replyConsumerFactory() {
         Map<String, Object> config = new HashMap<>();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, this.bootstrapServers);
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "reply-group");
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        config.put(JsonDeserializer.TRUSTED_PACKAGES, "com.katynova.dto,java.util,java.lang");
+        config.put(JsonDeserializer.TRUSTED_PACKAGES, "com.katynova.resto.common_dto_library,java.util,java.lang");
 
-        JsonDeserializer<List<HotDataDto>> valueDeserializer = new JsonDeserializer<>() {
-            @Override
-            public List<HotDataDto> deserialize(String topic, byte[] data) {
-                try {
-                    JavaType type = objectMapper.getTypeFactory()
-                            .constructCollectionType(List.class, HotDataDto.class);
-                    return objectMapper.readValue(data, type);
-                } catch (Exception e) {
-                    throw new SerializationException("Error deserializing HotDataDto list", e);
-                }
-            }
-        };
-        ErrorHandlingDeserializer<List<HotDataDto>> errorHandlingDeserializer =
+        JsonDeserializer<BookingResponse> valueDeserializer = new JsonDeserializer<>(BookingResponse.class, objectMapper);
+        ErrorHandlingDeserializer<BookingResponse> errorHandlingDeserializer =
                 new ErrorHandlingDeserializer<>(valueDeserializer);
 
         return new DefaultKafkaConsumerFactory<>(config, new StringDeserializer(), errorHandlingDeserializer);
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, List<HotDataDto>> replyContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, List<HotDataDto>> factory =
+    public ConcurrentKafkaListenerContainerFactory<String, BookingResponse> replyContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, BookingResponse> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(replyConsumerFactory());
         factory.setCommonErrorHandler(new DefaultErrorHandler());
@@ -87,19 +74,21 @@ public class KafkaRequestReplyConfig {
     }
 
     @Bean
-    public ConcurrentMessageListenerContainer<String, List<HotDataDto>> replyContainer() {
-        ConcurrentMessageListenerContainer<String, List<HotDataDto>> container =
-                replyContainerFactory().createContainer("data_response");
-        container.getContainerProperties().setGroupId("reply-group"); // УСТАНОВИТЬ ГРУППУ
+    public ConcurrentMessageListenerContainer<String, BookingResponse> replyContainer() {
+        ConcurrentMessageListenerContainer<String, BookingResponse> container =
+                replyContainerFactory().createContainer("response_topic");
+        container.getContainerProperties().setGroupId("reply-group");
         return container;
     }
 
     @Bean
-    public ReplyingKafkaTemplate<String, List<Long>, List<HotDataDto>> replyingKafkaTemplate() {
-        ReplyingKafkaTemplate<String, List<Long>, List<HotDataDto>> template =
+    public ReplyingKafkaTemplate<String, BookingRequestDto, BookingResponse> replyingKafkaTemplate() {
+        ReplyingKafkaTemplate<String, BookingRequestDto, BookingResponse> template =
                 new ReplyingKafkaTemplate<>(requestProducerFactory(), replyContainer());
         template.setDefaultReplyTimeout(Duration.ofSeconds(30));
         template.setSharedReplyTopic(true);
         return template;
     }
+
+
 }

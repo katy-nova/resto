@@ -1,4 +1,4 @@
-package com.katynova.resto.booking.service.time_graph.model;
+package com.katynova.resto.server_side.model;
 
 
 import java.time.LocalTime;

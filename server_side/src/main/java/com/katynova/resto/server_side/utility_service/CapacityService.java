@@ -1,7 +1,7 @@
-package com.katynova.resto.booking.service;
+package com.katynova.resto.server_side.utility_service;
 
-import com.katynova.resto.booking.exception.ManagerRequirementException;
-import com.katynova.resto.booking.repository.TableRepository;
+import com.katynova.resto.server_side.exception.ManagerRequirementException;
+import com.katynova.resto.server_side.repository.TableRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

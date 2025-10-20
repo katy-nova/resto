@@ -1,4 +1,4 @@
-package com.katynova.resto.server_side.model;
+package com.katynova.resto.server_side.model.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;

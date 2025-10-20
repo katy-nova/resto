@@ -1,4 +1,4 @@
-package com.katynova.resto.booking.config;
+package com.katynova.resto.server_side.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;

@@ -1,6 +1,6 @@
-package com.katynova.resto.booking.service.raw_booking_sql.model;
+package com.katynova.resto.server_side.model;
 
-import com.katynova.resto.booking.model.ResponseStatus;
+import com.katynova.resto.server_side.model.status.ResponseStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

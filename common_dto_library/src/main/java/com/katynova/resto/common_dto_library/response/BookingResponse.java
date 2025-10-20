@@ -1,11 +1,8 @@
-package com.katynova.resto.booking.dto.response;
+package com.katynova.resto.common_dto_library.response;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
@@ -23,6 +20,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @Getter
 @Setter
+@ToString
 public abstract class BookingResponse {
     private String correlationId;
     private Long requestId;

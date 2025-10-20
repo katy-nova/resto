@@ -1,8 +1,8 @@
-package com.katynova.resto.booking.service.time_graph;
+package com.katynova.resto.server_side.service;
 
-import com.katynova.resto.booking.model.RestTable;
-import com.katynova.resto.booking.service.WorkingHoursCounter;
-import com.katynova.resto.booking.service.time_graph.model.GraphSlot;
+import com.katynova.resto.server_side.model.GraphSlot;
+import com.katynova.resto.server_side.model.entity.RestTable;
+import com.katynova.resto.server_side.utility_service.WorkingHoursCounter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

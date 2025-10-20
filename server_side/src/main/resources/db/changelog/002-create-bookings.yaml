@@ -1,0 +1,86 @@
+databaseChangeLog:
+  - changeSet:
+      id: 2
+      author: katynova
+      changes:
+        - createSequence:
+            sequenceName: booking_sequence
+            incrementBy: 50
+            cacheSize: 1
+
+        - createTable:
+            tableName: bookings
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                  defaultValueComputed: "nextval('booking_sequence')"
+              - column:
+                  name: start_time
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: end_time
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+                    checkConstraint: "end_time > start_time"
+              - column:
+                  name: notes
+                  type: VARCHAR(255)
+              - column:
+                  name: table_number
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: persons
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: guest_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(255)
+              - column:
+                  name: created
+                  type: TIMESTAMP
+                  defaultValueComputed: "now()"
+              - column:
+                  name: expired
+                  type: TIMESTAMP
+
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: table_number
+            constraintName: table_number_fk
+            referencedTableName: restaurant_tables
+            referencedColumnNames: table_number
+            onDelete: RESTRICT
+
+        - createIndex:
+            indexName: idx_bookings_table_time_range
+            tableName: bookings
+            columns:
+              - column:
+                  name: table_number
+              - column:
+                  name: start_time
+              - column:
+                  name: end_time
+
+        - createIndex:
+            indexName: idx_bookings_guest_status
+            tableName: bookings
+            columns:
+              - column:
+                  name: guest_id
+              - column:
+                  name: status

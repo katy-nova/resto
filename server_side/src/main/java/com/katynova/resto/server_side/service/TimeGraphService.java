@@ -1,22 +1,21 @@
-package com.katynova.resto.booking.service.time_graph;
+package com.katynova.resto.server_side.service;
 
-import com.katynova.resto.booking.dto.BookingRequestDto;
-import com.katynova.resto.booking.service.raw_booking_sql.model.FindResponse;
-import com.katynova.resto.booking.dto.response.BookingResponse;
-import com.katynova.resto.booking.dto.response.BookingSuggestResponse;
-import com.katynova.resto.booking.exception.ConfirmationException;
-import com.katynova.resto.booking.exception.ConsistencyException;
-import com.katynova.resto.booking.model.Booking;
-import com.katynova.resto.booking.model.ResponseStatus;
-import com.katynova.resto.booking.model.RestTable;
-import com.katynova.resto.booking.repository.BookingRepository;
-import com.katynova.resto.booking.repository.TableRepository;
-import com.katynova.resto.booking.service.CapacityService;
-import com.katynova.resto.booking.service.WorkingHoursCounter;
-import com.katynova.resto.booking.service.time_graph.config.TimeGraphRefreshEvent;
-import com.katynova.resto.booking.service.time_graph.model.AppropriateBookingInfo;
-import com.katynova.resto.booking.service.time_graph.model.GraphSlot;
-import com.katynova.resto.booking.service.time_graph.model.SuggestBookingInfo;
+import com.katynova.resto.common_dto_library.BookingRequestDto;
+import com.katynova.resto.common_dto_library.response.BookingResponse;
+import com.katynova.resto.common_dto_library.response.BookingSuggestResponse;
+import com.katynova.resto.server_side.config.TimeGraphRefreshEvent;
+import com.katynova.resto.server_side.exception.ConsistencyException;
+import com.katynova.resto.server_side.model.FindResponse;
+import com.katynova.resto.server_side.model.GraphSlot;
+import com.katynova.resto.server_side.model.entity.Booking;
+import com.katynova.resto.server_side.model.entity.RestTable;
+import com.katynova.resto.server_side.model.info.AppropriateBookingInfo;
+import com.katynova.resto.server_side.model.info.SuggestBookingInfo;
+import com.katynova.resto.server_side.model.status.ResponseStatus;
+import com.katynova.resto.server_side.repository.BookingRepository;
+import com.katynova.resto.server_side.repository.TableRepository;
+import com.katynova.resto.server_side.utility_service.CapacityService;
+import com.katynova.resto.server_side.utility_service.WorkingHoursCounter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationListener;
@@ -38,7 +37,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Primary
 public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEvent> {
     private final BookingRepository bookingRepository;
     private final TableRepository tableRepository;
@@ -52,10 +50,7 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
 
     private final ConcurrentMap<LocalDate, ReentrantLock> locks = new ConcurrentHashMap<>();
 
-    // здесь храним ссылки на все зарезервированные слоты по correlationId
-    private final ConcurrentHashMap<String, ConcurrentHashMap<Integer,List<GraphSlot>>> reservedSlots = new ConcurrentHashMap<>();
-
-    protected ConcurrentMap<LocalDate, ConcurrentMap<Integer, ConcurrentMap<Integer, List<GraphSlot>>>> getTimeGraph() {
+    public ConcurrentMap<LocalDate, ConcurrentMap<Integer, ConcurrentMap<Integer, List<GraphSlot>>>> getTimeGraph() {
         return timeGraph;
     }
 
@@ -77,8 +72,7 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
         LocalDate day = booking.getStartTime().toLocalDate();
         LocalTime startTime = booking.getStartTime().toLocalTime();
         LocalTime endTime = booking.getEndTime().toLocalTime();
-        // не знаю, как здесь сделать правильно, предполагается, что данные в бд полностью согласованы, есть ли смысл
-        // блокировать день полностью?
+        // предполагается, что данные в бд полностью согласованы
         ReentrantLock lock = locks.computeIfAbsent(day, k -> new ReentrantLock());
         lock.lock();
         try {
@@ -105,7 +99,7 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
     }
 
     // ищем нужные слоты и резервируем их в графе
-    protected FindResponse<?> findBooking(BookingRequestDto bookingRequestDto) {
+    public FindResponse<?> findBooking(BookingRequestDto bookingRequestDto) {
         LocalDate day = workingHoursCounter.getOpenDateTime(bookingRequestDto.getStartTime()).toLocalDate();
         LocalTime startTime = bookingRequestDto.getStartTime().toLocalTime();
         LocalTime endTime = startTime.plus(bookingRequestDto.getDuration());
@@ -120,7 +114,7 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
                 if (!isDayExists) {
                     return addFirstBookingInDay(day, startTime, endTime, capacity);
                 }
-                FindResponse<AppropriateBookingInfo<GraphSlot>> maybeBooking = findAppropriateTableForBooking(day, startTime, endTime, capacity);
+                FindResponse<AppropriateBookingInfo> maybeBooking = findAppropriateTableForBooking(day, startTime, endTime, capacity);
                 if (maybeBooking != null) {
                     return maybeBooking;
                 }
@@ -185,8 +179,6 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
             }
         }
         if (!suggests.isEmpty()) {
-            // сохраняем все резервы по correlationId чтобы потом легко их разблокировать
-            reservedSlots.put(correlationId, slotsMap);
             return new FindResponse<>(suggests, ResponseStatus.SUGGESTED);
         }
         return null;
@@ -245,16 +237,16 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
         return endTime;
     }
 
-    private FindResponse<AppropriateBookingInfo<GraphSlot>> insertBookingFromInfo(AppropriateBookingInfo<GraphSlot> info) {
+    private FindResponse<AppropriateBookingInfo> insertBookingFromInfo(AppropriateBookingInfo info) {
         return new FindResponse<>(List.of(info), ResponseStatus.SUCCESS);
     }
 
-    private FindResponse<AppropriateBookingInfo<GraphSlot>> findAppropriateTableForBooking(LocalDate day, LocalTime startTime, LocalTime endTime, int capacity) {
+    private FindResponse<AppropriateBookingInfo> findAppropriateTableForBooking(LocalDate day, LocalTime startTime, LocalTime endTime, int capacity) {
         ConcurrentMap<Integer, List<GraphSlot>> allTablesWithCapacity = timeGraph.get(day).get(capacity);
         // пробуем найти столы, которые полностью удовлетворяют данным бронирования
-        List<AppropriateBookingInfo<GraphSlot>> slotsForBooking = new ArrayList<>();
+        List<AppropriateBookingInfo> slotsForBooking = new ArrayList<>();
         for (Map.Entry<Integer, List<GraphSlot>> entry : allTablesWithCapacity.entrySet()) {
-            AppropriateBookingInfo<GraphSlot> info = findAppropriateSlots(entry.getKey(), startTime, endTime, entry.getValue());
+            AppropriateBookingInfo info = findAppropriateSlots(entry.getKey(), startTime, endTime, entry.getValue());
             if (info != null) {
                 // если нашли идеально подходящий слот, сразу выходим из метода и сохраняемся в базу
                 if (info.getSlotsAfter() == 0 && info.getSlotsBefore() == 0) {
@@ -265,7 +257,7 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
         }
         if (!slotsForBooking.isEmpty()) {
             // ищем слот, стыкующийся с началом или концом
-            Optional<AppropriateBookingInfo<GraphSlot>> slotForBookingCloseToStartOrEnd = slotsForBooking.stream()
+            Optional<AppropriateBookingInfo> slotForBookingCloseToStartOrEnd = slotsForBooking.stream()
                     .filter(info -> info.getSlotsBefore() == 0 || info.getSlotsAfter() == 0)
                     .max(Comparator.comparingInt(info -> info.getSlotsAfter() + info.getSlotsBefore()));
             if (slotForBookingCloseToStartOrEnd.isPresent()) {
@@ -273,7 +265,7 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
             }
             // упрощенная сортировка - если нет точного стыка, то просто пытаемся найти максимальный зазор
             // можно расписать также подробно, как в прошлой реализации
-            AppropriateBookingInfo<GraphSlot> appropriateBookingInfo = slotsForBooking.stream()
+            AppropriateBookingInfo appropriateBookingInfo = slotsForBooking.stream()
                     .max(Comparator.comparingInt(info -> info.getSlotsAfter() + info.getSlotsBefore()))
                     .get();
             return insertBookingFromInfo(appropriateBookingInfo);
@@ -282,7 +274,7 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
     }
 
     // время начало брони ГАРАНТИРОВАННО совпадает с временем начала одного из слотов!
-    private AppropriateBookingInfo<GraphSlot> findAppropriateSlots(int tableNumber, LocalTime startTime, LocalTime endTime, List<GraphSlot> allSlots) {
+    private AppropriateBookingInfo findAppropriateSlots(int tableNumber, LocalTime startTime, LocalTime endTime, List<GraphSlot> allSlots) {
         int slotsBefore = 0;
         int slotsAfter = 0;
         List<GraphSlot> slots = new ArrayList<>();
@@ -312,7 +304,7 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
                 if (slot.isAvailable()) {
                     slotsAfter++;
                 } else {
-                    return new AppropriateBookingInfo<GraphSlot>(tableNumber, slotsBefore, slotsAfter, slots);
+                    return new AppropriateBookingInfo(tableNumber, slotsBefore, slotsAfter, slots);
                 }
                 break;
             }
@@ -327,14 +319,14 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
             if (slot.isAvailable()) {
                 slotsAfter++;
             } else {
-                return new AppropriateBookingInfo<GraphSlot>(tableNumber, slotsBefore, slotsAfter, slots);
+                return new AppropriateBookingInfo(tableNumber, slotsBefore, slotsAfter, slots);
             }
         }
 
-        return new AppropriateBookingInfo<GraphSlot>(tableNumber, slotsBefore, slotsAfter, slots);
+        return new AppropriateBookingInfo(tableNumber, slotsBefore, slotsAfter, slots);
     }
 
-    protected FindResponse<AppropriateBookingInfo<GraphSlot>> addFirstBookingInDay(LocalDate day, LocalTime startTime, LocalTime endTime, int capacity) {
+    protected FindResponse<AppropriateBookingInfo> addFirstBookingInDay(LocalDate day, LocalTime startTime, LocalTime endTime, int capacity) {
         List<RestTable> allTables = tableRepository.findAll();
         ConcurrentMap<Integer, ConcurrentMap<Integer, List<GraphSlot>>> daySlotsMap = graphCreator
                 .createDay(day, allTables);
@@ -346,7 +338,7 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
                 .filter(slot -> isSlotInTimeRange(slot, startTime, endTime))
                 .peek(GraphSlot::reserve) // резервируем стол, так как еще не знаем id брони
                 .toList();
-        AppropriateBookingInfo<GraphSlot> info = new AppropriateBookingInfo<GraphSlot>(tableNumber, 0, 0, slots);
+        AppropriateBookingInfo info = new AppropriateBookingInfo(tableNumber, 0, 0, slots);
         return new FindResponse<>(List.of(info), ResponseStatus.SUCCESS);
     }
 
@@ -358,56 +350,22 @@ public class TimeGraphService implements ApplicationListener<TimeGraphRefreshEve
                 slot.getTime().isBefore(endTime);
     }
 
-    // разблокируем все зарезервированные слоты
-    protected void removeSuggestedBookings(BookingResponse response) {
-        if (!reservedSlots.containsKey(response.getCorrelationId())) {
-            log.warn("Зарезервированные слоты для бронирования {} не найдены", response.getCorrelationId());
-            return;
-        }
-        BookingSuggestResponse suggestResponse = (BookingSuggestResponse) response;
-        // достаем день для бронирования
-        LocalDate day = workingHoursCounter.getOpenDateTime(suggestResponse.getSlots().getLast().getStartTime()).toLocalDate();
-        // блокируем операции по этому дню для других потоков
+
+    public void unreserveSlotsByBookingId(List<Long> bookingIds, LocalDateTime startTime) {
+        LocalDate day = workingHoursCounter.getOpenDateTime(startTime).toLocalDate();
         ReentrantLock lock = locks.computeIfAbsent(day, k -> new ReentrantLock());
         lock.lock();
         try {
-            reservedSlots.get(response.getCorrelationId()).values().stream().flatMap(Collection::stream).forEach(GraphSlot::unreserve);
-            reservedSlots.remove(response.getCorrelationId());
-        } finally {
+            timeGraph.get(day).values().stream()
+                    .flatMap(map -> map.values().stream())
+                    .flatMap(Collection::stream)
+                    .filter(graphSlot -> bookingIds.contains(graphSlot.bookingId().get()))
+                    .forEach(GraphSlot::unreserve);
+        }
+        finally {
             lock.unlock();
         }
     }
-
-    protected void confirmSlot(BookingSuggestResponse response, int tableNumber, Long bookingId) {
-        LocalDate day = workingHoursCounter.getOpenDateTime(response.getSlots().getLast().getStartTime()).toLocalDate();
-        ReentrantLock lock = locks.computeIfAbsent(day, k -> new ReentrantLock());
-        try {
-            if (!lock.tryLock(1, TimeUnit.SECONDS)) {
-                throw new ConfirmationException("Превышено время ожидания подтверждения запроса на бронирование. Повторите попытку позже");
-            }
-            try {
-                reservedSlots.get(response.getCorrelationId()).get(tableNumber).forEach(graphSlot -> graphSlot.book(bookingId));
-                reservedSlots.get(response.getCorrelationId()).remove(tableNumber);
-                reservedSlots.get(response.getCorrelationId()).values().stream().flatMap(Collection::stream).forEach(GraphSlot::unreserve);
-                reservedSlots.remove(response.getCorrelationId());
-            } finally {
-                lock.unlock();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt(); // Восстанавливаем флаг прерывания
-            log.error("Поток был прерван при подтверждении бронирования: {}", e.getMessage());
-            throw new ConfirmationException("Произошла непредвиденная ошибка при обработке подтверждения бронирования");
-        }
-    }
-
-    protected boolean containsCorrelationId(String correlationId) {
-        return reservedSlots.containsKey(correlationId);
-    }
-
-    protected boolean containsSlotsForTable(String correlationId, int tableNumber) {
-        return reservedSlots.get(correlationId).containsKey(tableNumber);
-    }
-
 
     @Override
     @Transactional(readOnly = true)

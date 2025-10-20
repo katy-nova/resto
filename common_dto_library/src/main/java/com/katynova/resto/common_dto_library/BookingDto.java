@@ -1,4 +1,4 @@
-package com.katynova.resto.booking.dto;
+package com.katynova.resto.common_dto_library;
 
 import lombok.Data;
 

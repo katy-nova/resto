@@ -1,7 +1,8 @@
-package com.katynova.resto.booking.service;
+package com.katynova.resto.server_side.utility_service;
 
-import com.katynova.resto.booking.repository.BookingRepository;
-import com.katynova.resto.booking.service.time_graph.config.TimeGraphRefreshEvent;
+
+import com.katynova.resto.server_side.config.TimeGraphRefreshEvent;
+import com.katynova.resto.server_side.repository.BookingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;

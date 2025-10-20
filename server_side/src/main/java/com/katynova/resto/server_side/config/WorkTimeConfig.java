@@ -1,4 +1,4 @@
-package com.katynova.resto.booking.config;
+package com.katynova.resto.server_side.config;
 
 import lombok.Getter;
 import lombok.Setter;

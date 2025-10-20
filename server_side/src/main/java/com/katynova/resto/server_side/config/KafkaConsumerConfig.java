@@ -1,10 +1,10 @@
-package com.katynova.resto.booking.config;
+package com.katynova.resto.server_side.config;
 
-import com.katynova.resto.booking.dto.BookingRequestDto;
-import com.katynova.resto.booking.dto.response.SlotConfirmation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.katynova.resto.common_dto_library.BookingRequestDto;
+import com.katynova.resto.common_dto_library.response.SlotConfirmation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -45,7 +45,7 @@ public class KafkaConsumerConfig {
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
 
         JsonDeserializer<BookingRequestDto> deserializer = new JsonDeserializer<>(BookingRequestDto.class, objectMapper);
-        deserializer.addTrustedPackages("com.example.resto.booking.dto");
+        deserializer.addTrustedPackages("com.katynova.resto.common_dto_library");
         log.info("Creating ConsumerFactory with BookingRequestDto deserializer");
         return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), deserializer);
     }
